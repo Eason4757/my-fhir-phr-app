@@ -6,70 +6,139 @@
     <title>我的 FHIR PHR App (Client 端)</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
-        h1 { color: #333; }
-        button { padding: 10px 15px; font-size: 16px; cursor: pointer; }
-        pre { background-color: #f4f4f4; border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+        h1, h2 { color: #333; }
+        button { padding: 10px 15px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        pre { background-color: #f4f4f4; border: 1px solid #ddd; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }
+        input { font-size: 16px; padding: 5px; }
+        form { background-color: #eee; padding: 15px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
-    <h1>簡易 FHIR Client</h1>
+    <h1>簡易 FHIR Client (v2.0)</h1>
+    
+    <hr>
+    
+    <h2>1. 新增一筆血壓紀錄 (POST)</h2>
+    <form id="create-form">
+        <label for="systolic">收縮壓 (Systolic):</label>
+        <input type="number" id="systolic" value="120" required>
+        <br><br>
+        <label for="diastolic">舒張壓 (Diastolic):</label>
+        <input type="number" id="diastolic" value="80" required>
+        <br>
+        <button type="submit" id="createButton">新增 (POST) 血壓</button>
+    </form>
+    
+    <hr>
+    
+    <h2>2. 讀取所有體徵紀錄 (GET)</h2>
     <p>
         點擊下方按鈕，將會從 <code>https://server.fire.ly/</code> 讀取資料。
     </p>
-    <button id="fetchButton">讀取資料 (GET Observation)</button>
+    <button id="fetchButton">讀取 (GET) 資料</button>
 
-    <h2>日誌輸出 (Log Output):</h2>
-    <pre id="log-output">點擊按鈕以載入資料...</pre>
+    <hr>
+
+    <h2>3. 日誌輸出 (Log Output):</h2>
+    <pre id="log-output">請操作...</pre>
 
     <script>
-        // --- 您的 FHIR Client 端程式 ---
+        // --- 您的 FHIR Client 端程式 v2.0 ---
 
         // 1. 定義我們要讀取的病患 ID
         // [!] 請確認這就是您在 Postman 測試的 Patient ID
-        const PATIENT_ID = "8e1bc8c6-101e-45e3-a2f2-e8df8db88dda"; 
+        const PATIENT_ID = "8e1bc8c6-101e-453a-a2f2-e8df8db88dda"; // <-- 確保 ID 正確
 
         // 2. 定義 FHIR Server 的 Endpoint
         const FHIR_SERVER_URL = "https://server.fire.ly";
 
         // 3. 取得頁面上的元素
+        const createForm = document.getElementById("create-form");
         const fetchButton = document.getElementById("fetchButton");
         const logOutput = document.getElementById("log-output");
 
-        // 4. 定義「讀取資料」的函式 (SD 規格的實作)
+        // 4. 定義「讀取資料」的函式 (GET) (與 v1.0 相同)
         async function fetchObservations() {
-            
-            logOutput.textContent = "正在讀取中，請稍候...";
-
-            // 這是我們在 SD 文件中定義的 API Endpoint
+            logOutput.textContent = "正在讀取中...";
             const requestUrl = `${FHIR_SERVER_URL}/Observation?patient=${PATIENT_ID}`;
 
             try {
-                // 發送 GET 請求
                 const response = await fetch(requestUrl);
-
-                if (!response.ok) {
-                    throw new Error(`HTTP 錯誤! 狀態: ${response.status}`);
-                }
-
-                // 將回應轉為 JSON
+                if (!response.ok) throw new Error(`HTTP 錯誤! 狀態: ${response.status}`);
                 const data = await response.json();
-
-                // (重要) 在瀏覽器主控台 (Console) 印出完整 JSON
-                console.log("--- FHIR 伺服器完整回應 (Bundle) ---");
+                
+                console.log("--- FHIR 伺服器 GET 回應 (Bundle) ---");
                 console.log(data);
-
-                // 在畫面上顯示漂亮的 JSON
-                logOutput.textContent = JSON.stringify(data, null, 2); // 2 個空白縮排
-
+                logOutput.textContent = JSON.stringify(data, null, 2);
             } catch (error) {
                 console.error("讀取失敗:", error);
                 logOutput.textContent = `讀取失敗: ${error.message}`;
             }
         }
+        
+        // 5. 定義「新增資料」的函式 (POST) (新功能)
+        async function createObservation(event) {
+            // 阻止表單的預設提交動作 (才不會刷新頁面)
+            event.preventDefault(); 
+            
+            logOutput.textContent = "正在新增中...";
 
-        // 5. 幫按鈕加上點擊事件
+            // 從表單讀取使用者輸入的值
+            const systolicValue = document.getElementById("systolic").value;
+            const diastolicValue = document.getElementById("diastolic").value;
+
+            // 根據 SD 文件規格，建立 FHIR Observation JSON
+            const bloodPressureResource = {
+                "resourceType": "Observation",
+                "status": "final",
+                "category": [{ "coding": [{ "system": "http://terminology.hl7.org/CodeSystem/observation-category", "code": "vital-signs" }] }],
+                "code": { "coding": [{ "system": "http://loinc.org", "code": "85354-9", "display": "Blood Pressure" }] },
+                "subject": {
+                    "reference": `Patient/${PATIENT_ID}` // 連結到我們的病患
+                },
+                "effectiveDateTime": new Date().toISOString(), // 使用當下時間
+                "component": [
+                    {
+                        "code": { "coding": [{ "system": "http://loinc.org", "code": "8480-6", "display": "Systolic" }] },
+                        "valueQuantity": { "value": Number(systolicValue), "unit": "mmHg" }
+                    },
+                    {
+                        "code": { "coding": [{ "system": "http://loinc.org", "code": "8462-4", "display": "Diastolic" }] },
+                        "valueQuantity": { "value": Number(diastolicValue), "unit": "mmHg" }
+                    }
+                ]
+            };
+
+            const requestUrl = `${FHIR_SERVER_URL}/Observation`;
+
+            try {
+                // 發送 POST 請求
+                const response = await fetch(requestUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/fhir+json'
+                    },
+                    body: JSON.stringify(bloodPressureResource) // 將 JSON 物件轉為字串
+                });
+
+                if (!response.ok) throw new Error(`HTTP 錯誤! 狀態: ${response.status}`);
+                
+                const data = await response.json();
+                
+                console.log("--- FHIR 伺服器 POST 回應 (Resource) ---");
+                console.log(data);
+                logOutput.textContent = `新增成功! 伺服器回應：\n\n${JSON.stringify(data, null, 2)}`;
+
+            } catch (error) {
+                console.error("新增失敗:", error);
+                logOutput.textContent = `新增失敗: ${error.message}`;
+            }
+        }
+
+        // 6. 幫按鈕和表單加上事件
         fetchButton.addEventListener("click", fetchObservations);
+        createForm.addEventListener("submit", createObservation);
 
     </script>
 
