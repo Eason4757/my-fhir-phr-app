@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的 FHIR PHR App (Client 端)</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { color: #333; }
+        button { padding: 10px 15px; font-size: 16px; cursor: pointer; }
+        pre { background-color: #f4f4f4; border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <h1>簡易 FHIR Client</h1>
+    <p>
+        點擊下方按鈕，將會從 <code>https://server.fire.ly/</code> 讀取資料。
+    </p>
+    <button id="fetchButton">讀取資料 (GET Observation)</button>
+
+    <h2>日誌輸出 (Log Output):</h2>
+    <pre id="log-output">點擊按鈕以載入資料...</pre>
+
+    <script>
+        // --- 您的 FHIR Client 端程式 ---
+
+        // 1. 定義我們要讀取的病患 ID
+        // [!] 請確認這就是您在 Postman 測試的 Patient ID
+        const PATIENT_ID = "8e1bc8c6-101e-45e3-a2f2-e8df8db88dda"; 
+
+        // 2. 定義 FHIR Server 的 Endpoint
+        const FHIR_SERVER_URL = "https://server.fire.ly";
+
+        // 3. 取得頁面上的元素
+        const fetchButton = document.getElementById("fetchButton");
+        const logOutput = document.getElementById("log-output");
+
+        // 4. 定義「讀取資料」的函式 (SD 規格的實作)
+        async function fetchObservations() {
+            
+            logOutput.textContent = "正在讀取中，請稍候...";
+
+            // 這是我們在 SD 文件中定義的 API Endpoint
+            const requestUrl = `${FHIR_SERVER_URL}/Observation?patient=${PATIENT_ID}`;
+
+            try {
+                // 發送 GET 請求
+                const response = await fetch(requestUrl);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP 錯誤! 狀態: ${response.status}`);
+                }
+
+                // 將回應轉為 JSON
+                const data = await response.json();
+
+                // (重要) 在瀏覽器主控台 (Console) 印出完整 JSON
+                console.log("--- FHIR 伺服器完整回應 (Bundle) ---");
+                console.log(data);
+
+                // 在畫面上顯示漂亮的 JSON
+                logOutput.textContent = JSON.stringify(data, null, 2); // 2 個空白縮排
+
+            } catch (error) {
+                console.error("讀取失敗:", error);
+                logOutput.textContent = `讀取失敗: ${error.message}`;
+            }
+        }
+
+        // 5. 幫按鈕加上點擊事件
+        fetchButton.addEventListener("click", fetchObservations);
+
+    </script>
+
+</body>
+</html>
